@@ -3,7 +3,7 @@ class DataLoader:
 		self.pathTrainingData = pathTrainingData
 		self.cargarClases()
 
-	def.selfCargarClases(self):
+	def selfCargarClases(self):
 		self.classes = self.extraerNombreSubCarpetas(self.pathTrainingData)
 		self.numClasses = len(self.classes)
 		

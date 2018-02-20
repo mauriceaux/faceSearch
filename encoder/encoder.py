@@ -15,6 +15,7 @@ import os
 class Encoder:
 
 	def __init__(self, path="nopath/", batchSize=0):
+		print("constructor encoder")
 		self.escritor = Escritor()
 		self.path = path
 		self.escritor.escribir(str(self) + "_init_", "path es : " + str(self.path))

@@ -1,5 +1,5 @@
-from clasificador.clasificador import Clasificador
-from encoder.encoder import Encoder
+from models.clasificador  import Clasificador
+from models.autoencoder import Autoencoder
 from data.loader import DataLoader
 import keras
 from keras.models import Sequential
@@ -8,12 +8,18 @@ from keras.optimizers import Adam
 
 class faceSearch:
 
-	def entrenar(self):
+	def __init__(self):
+		#self.autoencoder = Encoder()
+		print("init")
 		self.clasificador = Clasificador()
-		self.autoencoder = Encoder()
-		self.dataLoader = DataLoader()
-		self.dataLoader.setPathClassData(self.pathTrainingData)
+		self.autoencoder = Autoencoder()
+
+	def entrenar(self):
+		
+		#self.dataLoader = DataLoader()
+		#self.dataLoader.setPathClassData(self.pathTrainingData)
 		initModel()
+		exit()
 		loss = 1
 		while loss > self.threshold:
 			self.trainingSet, self.labelsSet = self.dataLoader.nextTrainingData(labels=True)
@@ -21,7 +27,7 @@ class faceSearch:
 			self.entrenador.train_on_batch(self.trainingSet, self.labelsSet)
 			self.autoencoder.getEncoder().trainable(False)
 			loss = self.validador.train_on_batch(self.trainingSet, self.trainingSet)
-			print("% Completado " + str((self.umbral//loss) * 100), end="\r")
+			print("% Completado " + str((self.umbral//loss) * 100), end='\r')
 
 
 

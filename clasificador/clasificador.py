@@ -255,7 +255,7 @@ class Clasificador:
 		return model
 
 
-	def getModel(self)
+	def getModel(self):
 		return self.model
 
 	def cargar(self):
