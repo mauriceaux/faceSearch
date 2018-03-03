@@ -1,10 +1,14 @@
 from models.clasificador  import Clasificador
+from keras.layers.normalization import BatchNormalization
 from models.autoencoder import Autoencoder
 from data.loader import DataLoader
 import keras
 from keras.models import Sequential
 from keras.optimizers import Adam
 from data.loader import DataLoader
+from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
+#from keras.layers.convolutional import Convolution2D, AveragePooling2D
+from keras.layers import Dense, Dropout, Flatten
 
 import os
 import shlex, subprocess
@@ -29,43 +33,58 @@ class faceSearch:
 		self.setNumClasses(self.dataLoader.getNumClasses())
 		self.classes = self.dataLoader.getClasses()
 		self.threshold = 5e-8
-		self.optimizer = None
+		self.inputDim = 64
+
+		self.batchSize = 40
+		self.dataLoader.setBatchSize(self.batchSize)
+		self.epochs = 10
 
 	def setEncoderDim(self, dim):
 		self.clasificador.setEncoderDim(dim)
 		self.autoencoder.setEncoderDim(dim)
 
 	def setInputDim(self, dim):
-		self.autoencoder.setInputDim(dim)
+		self.inputDim = dim
 
 	def setNumClasses(self, num):
-		self.clasificador.setNumClasses(num)
+		self.numClasses = num
 
 
 	def entrenar(self):
 		
-		self.dataLoader.generarHogData()
+		self.dataLoader.cargarData()
 		if(self.modeloIniciado == False):
 			self.setInputDim(self.dataLoader.getInputDim())
-			#print("self.dataLoader.getInputDim()", self.dataLoader.getInputDim())
-			#exit()
-			self.setEncoderDim(int(self.dataLoader.getInputDim()/10))
 			self.initModel()
 		#exit()
 		loss = 1
-		lossBuscador = [1,0]
+		lossBuscador = 1
 		contador = 0
-		optimizer = Adam(lr=5e-5, beta_1=0.5, beta_2=0.999)
-		while lossBuscador[0] > self.threshold:
+		#optimizer = Adam(lr=5e-5, beta_1=0.5, beta_2=0.999)
+
+
+
+
+		while lossBuscador > self.threshold:
 			self.trainingSet, self.labelsSet = self.dataLoader.nextTrainingData(labels=True)
-			#self.autoencoder.encoder.trainable = True
-			self.autoencoder.encoder.compile(loss='mean_absolute_error', optimizer=optimizer)
-			lossBuscador = self.buscador.train_on_batch(self.trainingSet, self.labelsSet)
-			#self.autoencoder.encoder.trainable = False
-			#self.autoencoder.encoder.compile(loss='mean_absolute_error', optimizer=optimizer)
-			#loss = self.validador.train_on_batch(self.trainingSet, self.trainingSet)
-			print("% Completado " + str((self.threshold/lossBuscador[0]) * 100), end='\r')
-			#print("% Completado " + str((self.threshold//loss) * 100) + " loss buscador: " + str(lossBuscador), end='\r')
+			self.testingSet, self.testLabelSet = self.dataLoader.nextTestingData(labels=True)
+
+
+			#loss = self.buscador.fit(self.trainingSet, self.labelsSet,
+			#	batch_size=self.batchSize,
+			#	epochs=self.epochs,
+			#	verbose=0,
+			#	validation_data=(self.testingSet, self.testLabelSet))
+			loss = self.buscador.train_on_batch(self.trainingSet, self.labelsSet)
+			score = self.buscador.evaluate(self.testingSet, self.testLabelSet, verbose=0)
+			lossBuscador = score[0]
+			#print('Test loss:', score[0])
+			#print('Test accuracy:', score[1])
+
+			#
+			#lossBuscador = self.buscador.train_on_batch(self.trainingSet, self.labelsSet)
+			#print("% Completado " + str(score[0]) + "            ", end='\r')
+			print("% Completado " + str((self.threshold/lossBuscador) * 100) + "      loss: " + str(score[0]) + " accurracy " + str(score[1]), end='\r')
 			contador += 1
 			if contador%100 == 0:
 				self.guardarAvance()
@@ -73,39 +92,77 @@ class faceSearch:
 				contador = 0
 
 	def guardarAvance(self):
-		self.buscador.save_weights(os.path.normpath(os.getcwd() + "/models/pesos/buscador.h5"), True)	
-		self.validador.save_weights(os.path.normpath(os.getcwd() + "/models/pesos/validador.h5"), True)	
-
+		self.buscador.save_weights(os.path.normpath(os.getcwd() + "/models/pesos/model.h5"), True)	
 
 	def initModel(self):
 		if(self.modeloIniciado == True):
 			return
 
-		optimizerEncoder = Adam(lr=5e-5, beta_1=0.5, beta_2=0.999)
-		self.autoencoder.getEncoder().compile(loss='mean_absolute_error', optimizer=optimizerEncoder)
+		self.buscador = Sequential()
+		self.buscador.add(Conv2D(64, kernel_size=(5, 5),
+							activation='relu',
+							data_format='channels_first',
+							border_mode='same',
+							input_shape=(1, self.inputDim, self.inputDim)))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		self.buscador.add(Conv2D(32, (10, 10), activation='relu'))
 
-		optimizerClasificador = Adam(lr=5e-5, beta_1=0.1, beta_2=0.999)
-		self.clasificador.getModel().compile(loss=keras.losses.categorical_crossentropy,
-			optimizer=keras.optimizers.Adadelta(),
-			metrics=['accuracy'])
 		
 
-		self.buscador = Sequential()
-		self.buscador.add(self.autoencoder.getEncoder())
-		self.buscador.add(self.clasificador.getModel())
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		self.buscador.add(Conv2D(16, (5, 5), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		self.buscador.add(Conv2D(8, (5, 5), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		self.buscador.add(Conv2D(4, (5, 5), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		self.buscador.add(Conv2D(2, (5, 5), activation='relu'))
 
-		self.validador = Sequential()
-		self.validador.add(self.autoencoder.getEncoder())
-		self.validador.add(self.autoencoder.getDecoder())
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		#self.buscador.add(Conv2D(12, (5, 5), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		#self.buscador.add(Conv2D(20, (5, 5), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		#self.buscador.add(Conv2D(12, (5, 5), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		#self.buscador.add(Conv2D(12, (1, 1), activation='relu'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		#self.buscador.add(Conv2D(64, (5, 5), activation='tanh'))
+		#self.buscador.add(MaxPooling2D(pool_size=(2, 2)))
+		#self.buscador.add(AveragePooling2D(pool_size=(2, 2)))
+		#self.buscador.add(Dropout(0.25))
+		self.buscador.add(Flatten())
+		#self.buscador.add(Dense(128, activation='tanh'))
+		
+			#, kernel_regularizer=keras.regularizers.l2(0.01)
+			#, activity_regularizer=keras.regularizers.l1(0.01)))
+		#self.buscador.add(Dropout(0.25))
+		#self.buscador.add(Dense(128, activation='tanh'))
+			#, kernel_regularizer=keras.regularizers.l2(0.01)
+			#, activity_regularizer=keras.regularizers.l1(0.01)))
+		#self.buscador.add(Dropout(0.25))
+		#self.buscador.add(Dense(128, activation='tanh'))
+			#, kernel_regularizer=keras.regularizers.l2(0.01)
+			#, activity_regularizer=keras.regularizers.l1(0.01)))
+		#self.buscador.add(Dropout(0.25))
+		#self.buscador.add(Dense(128, activation='tanh'))
+			#, kernel_regularizer=keras.regularizers.l2(0.01)
+			#, activity_regularizer=keras.regularizers.l1(0.01)))
+		#self.buscador.add(Dropout(0.5))
+		self.buscador.add(Dropout(0.25))
+		
+		self.buscador.add(Dense(self.numClasses, activation='softmax'))
+		#self.buscador.summary()
+		#exit()
+		optimizer = Adam(lr=5e-9, beta_1=0.5, beta_2=0.999)
 
-		optimizer = Adam(lr=5e-5, beta_1=0.5, beta_2=0.999)
-
-		self.buscador.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adadelta(),
-			metrics=['accuracy'])
-		#self.validador.compile(loss='mean_absolute_error', optimizer=optimizer)
+		#este funciona!
+		#optimizer = keras.optimizers.Adadelta()
+		self.buscador.compile(loss=keras.losses.categorical_crossentropy,
+              optimizer=optimizer
+              ,metrics=['accuracy'])
 		try:
-			self.buscador.load_weights(os.path.normpath(os.getcwd() + "/models/pesos/buscador.h5"), True)
-			self.validador.load_weights(os.path.normpath(os.getcwd() + "/models/pesos/validador.h5"), True)
+			self.buscador.load_weights(os.path.normpath(os.getcwd() + "/models/pesos/model.h5"), True)
 			print("pesos cargados")
 		except OSError:
 			print("no se han creado los pesos")
@@ -130,58 +187,23 @@ class faceSearch:
 
 		p.kill()
 
-		winSize = (20,20)
-		blockSize = (10,10)
-		blockStride = (5,5)
-		cellSize = (10,10)
-		nbins = 9
-		derivAperture = 1
-		winSigma = -1.
-		histogramNormType = 0
-		L2HysThreshold = 0.2
-		gammaCorrection = 1
-		nlevels = 64
-		signedGradients = True
-
-		hog = cv2.HOGDescriptor(winSize
-			,blockSize
-			,blockStride
-			,cellSize
-			,nbins
-			,derivAperture
-			,winSigma
-			,histogramNormType
-			,L2HysThreshold
-			,gammaCorrection
-			,nlevels
-			,signedGradients)
-
 		filesList = []
 		for subdir, dirs, files in os.walk(self.pathImgGenerada):
 			for file in files:
 				filesList.append(os.path.join(subdir, file))
 
+		imgs = []
 		for file in filesList:
 			im = cv2.imread(file)
 			im = cv2.resize(im,(64,64), interpolation = cv2.INTER_AREA)
 			im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-			h = hog.compute(im)
+			#cv2.imwrite(file,im)
+			im = np.reshape(im, (1, 1, im.shape[0], im.shape[1]))
 
 			if(self.modeloIniciado == False):
-				self.setInputDim(h.shape[0])
-				self.setEncoderDim(h.shape[0]//10)
+				self.setInputDim(im.shape[2])
 				self.initModel()
-			h = np.reshape(h, (h.shape[1], h.shape[0]))
-			predicted = self.buscador.predict(h)
-			#print("prediccion", str(predicted))
-			#for i in range(0, len(self.classes)):
-			#	print(self.classes[i] + " -> " + str(predicted[0][i]))
-			#print(str(self.classes[0]))
-			print("prediccion " + str(self.classes[self.buscador.predict(h).argmax()]))
+			#imgs.append(im)
 
-
-
-
-		resultado = "soy el resultado"
-		#IMPLEMENTAME
-		return resultado
+		#predicted = self.buscador.predict(imgs)
+			print("prediccion " + str(self.classes[self.buscador.predict(im).argmax()]))
