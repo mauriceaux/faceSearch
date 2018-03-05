@@ -1,6 +1,6 @@
-from models.clasificador  import Clasificador
+#from models.clasificador  import Clasificador
 from keras.layers.normalization import BatchNormalization
-from models.autoencoder import Autoencoder
+#from models.autoencoder import Autoencoder
 from data.loader import DataLoader
 import keras
 from keras.models import Sequential
@@ -21,8 +21,8 @@ class faceSearch:
 
 	def __init__(self):
 		print("init")
-		self.clasificador = Clasificador()
-		self.autoencoder = Autoencoder()
+		#self.clasificador = Clasificador()
+		#self.autoencoder = Autoencoder()
 		self.pathLib = os.path.normpath(os.getcwd() + "/lib/deepfakes/faceswap.py")
 		self.pathImgGenerada = os.path.normpath(os.getcwd() + "/tmp/faces")
 		self.modeloIniciado = False
@@ -39,9 +39,9 @@ class faceSearch:
 		self.dataLoader.setBatchSize(self.batchSize)
 		self.epochs = 10
 
-	def setEncoderDim(self, dim):
-		self.clasificador.setEncoderDim(dim)
-		self.autoencoder.setEncoderDim(dim)
+	#def setEncoderDim(self, dim):
+	#	self.clasificador.setEncoderDim(dim)
+	#	self.autoencoder.setEncoderDim(dim)
 
 	def setInputDim(self, dim):
 		self.inputDim = dim
@@ -154,10 +154,10 @@ class faceSearch:
 		self.buscador.add(Dense(self.numClasses, activation='softmax'))
 		#self.buscador.summary()
 		#exit()
-		optimizer = Adam(lr=5e-9, beta_1=0.5, beta_2=0.999)
+		#optimizer = Adam(lr=5e-9, beta_1=0.5, beta_2=0.999)
 
 		#este funciona!
-		#optimizer = keras.optimizers.Adadelta()
+		optimizer = keras.optimizers.Adadelta()
 		self.buscador.compile(loss=keras.losses.categorical_crossentropy,
               optimizer=optimizer
               ,metrics=['accuracy'])
